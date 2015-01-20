@@ -187,26 +187,45 @@ if __name__ == "__main__":
     g_V=np.linspace(1.e5, 6.e10,101)
     grand_V=np.linspace(1.e5, 6.e10,101)
     diff_V=np.linspace(1.e5, 6.e10,101)
+    diff_orig_V=np.linspace(1.e5, 6.e10,101)
     diff_K=np.linspace(1.e5, 6.e10,101)
 
     P=1.e5
     grand.set_state(P, T)
     g.set_state(P,T)
 
-    dVdP=grand.V/grand.K_T - 0.5*(g.endmembers[0][0].V/g.endmembers[0][0].K_T + g.endmembers[1][0].V/g.endmembers[1][0].K_T)
-    d2VdP2=grand.V*(1.+grand.params['Kprime_0'])/(grand.K_T*grand.K_T*grand.params['Kprime_0']) - 0.5*(g.endmembers[0][0].V*(1.+g.endmembers[0][0].params['Kprime_0'])/(g.endmembers[0][0].K_T*g.endmembers[0][0].K_T*g.endmembers[0][0].params['Kprime_0']) + g.endmembers[1][0].V*(1.+g.endmembers[1][0].params['Kprime_0'])/(g.endmembers[1][0].K_T*g.endmembers[1][0].K_T*g.endmembers[1][0].params['Kprime_0']))
+    import burnman.eos.modified_tait as mt
+    a, b, c = mt.tait_constants(grand.params)
+    a0, b0, c0 = mt.tait_constants(g.endmembers[0][0].params)
+    a1, b1, c1 = mt.tait_constants(g.endmembers[1][0].params)
+
+    VoK =grand.V/grand.K_T
+    VoK0=g.endmembers[0][0].params['V_0']/g.endmembers[0][0].params['K_0']
+    VoK1=g.endmembers[1][0].params['V_0']/g.endmembers[1][0].params['K_0']
+
+    #b*(c+1)
+    dVdP=VoK - 0.5*(VoK0 + VoK1)
+    d2VdP2=VoK*b*(c+1.)/grand.params['Kprime_0'] - 0.5*(VoK0*b0*(c0+1.)/g.endmembers[0][0].params['Kprime_0'] + VoK1*b1*(c1+1.)/g.endmembers[1][0].params['Kprime_0'])
+    d3VdP3=(1./2./2./2.)*VoK*b*b*(c+1.)*(c+2.)/grand.params['Kprime_0']/grand.params['Kprime_0'] - (0.5/2./2./2.)*(VoK0*b0*b0*(c0+1.)*(c0+2.)/g.endmembers[0][0].params['Kprime_0']/g.endmembers[0][0].params['Kprime_0'] + VoK1*b1*b1*(c1+1.)*(c1+2.)/g.endmembers[1][0].params['Kprime_0']/g.endmembers[1][0].params['Kprime_0']) # need to check this equation
+
+    d4VdP4=(1./2./2./2./3.)*VoK*b*b*b*(c+1.)*(c+2.)*(c+3.)/grand.params['Kprime_0']/grand.params['Kprime_0']/grand.params['Kprime_0'] - (0.5/2./2./2./3.)*(VoK0*b0*b0*b0*(c0+1.)*(c0+2.)*(c0+3.)/g.endmembers[0][0].params['Kprime_0']/g.endmembers[0][0].params['Kprime_0']/g.endmembers[0][0].params['Kprime_0'] + VoK1*b1*b1*b1*(c1+1.)*(c1+2.)*(c1+3.)/g.endmembers[1][0].params['Kprime_0']/g.endmembers[1][0].params['Kprime_0']/g.endmembers[1][0].params['Kprime_0']) # need to check this equation
+
+    #d2VdP2=VoK*(1.+grand.params['Kprime_0'])/(grand.K_T*grand.params['Kprime_0']) - 0.5*(g.endmembers[0][0].V*(1.+g.endmembers[0][0].params['Kprime_0'])/(g.endmembers[0][0].K_T*g.endmembers[0][0].K_T*g.endmembers[0][0].params['Kprime_0']) + g.endmembers[1][0].V*(1.+g.endmembers[1][0].params['Kprime_0'])/(g.endmembers[1][0].K_T*g.endmembers[1][0].K_T*g.endmembers[1][0].params['Kprime_0']))
 
     for i,P in enumerate(pressures):
         grand.set_state(P, T)
         g.set_state(P,T)
         g_V[i] = g.V
-        diff_V[i] = (grand.V-g.V+dVdP*P-d2VdP2*P*P)/g.V*100.
+        diff_V[i] = (grand.V-g.V + dVdP*P - d2VdP2*P*P + d3VdP3*P*P*P - d4VdP4*P*P*P*P)/g.V*100.
+        diff_orig_V[i] = (grand.V-g.V)/g.V*100.
         diff_K[i] = (grand.K_T-g.K_T)/g.K_T*100.
 
     plt.plot( pressures/1.e9, diff_V, marker='.', linewidth=1., label='V, Grandite endmember - 50% solid solution')
+    plt.plot( pressures/1.e9, diff_orig_V, marker='.', linewidth=1., label='V, Grandite endmember - 50% solid solution')
     plt.plot( pressures/1.e9, diff_K, marker='.', linewidth=1., label='K, Grandite endmember - 50% solid solution')
     plt.title("Grossular-andradite join (asymmetric model)")
     plt.ylabel("% difference")
     plt.xlabel("pressure (GPa)")
+    plt.ylim(-0.2, 0.2)
     plt.legend(loc='upper left')
     plt.show()
